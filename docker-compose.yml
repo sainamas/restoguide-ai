@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: restoguide-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: restoguide
+      POSTGRES_USER: restoguide
+      POSTGRES_PASSWORD: restoguide_dev_password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - restoguide_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  restoguide_postgres_data:
