@@ -1,3 +1,4 @@
+from app.services.operational_schema import SCHEMA_SQL
 import os
 
 import psycopg
@@ -25,3 +26,9 @@ def check_connection() -> bool:
         return result == (1,)
     except psycopg.Error:
         return False
+def initialize_schema() -> None:
+    """Create the operational database tables if they do not exist."""
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(SCHEMA_SQL)
+        connection.commit()
