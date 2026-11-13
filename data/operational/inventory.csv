@@ -1,0 +1,17 @@
+inventory_id,branch_id,inventory_date,item_name,opening_stock_kg,purchased_stock_kg,closing_stock_kg,spoilage_kg
+I001,A,2026-10-05,Chicken,18,35,43,2.0
+I002,A,2026-10-05,Vegetables,15,28,37,1.8
+I003,A,2026-10-05,Rice,20,30,38,1.2
+I004,A,2026-10-06,Chicken,17,36,45,2.2
+I005,A,2026-10-06,Vegetables,16,30,40,1.9
+I006,A,2026-10-06,Rice,18,32,40,1.4
+I007,B,2026-10-05,Chicken,10,22,24,0.6
+I008,B,2026-10-05,Vegetables,9,18,19,0.5
+I009,B,2026-10-05,Rice,12,20,21,0.4
+I010,B,2026-10-06,Chicken,11,24,25,0.5
+I011,B,2026-10-06,Vegetables,10,19,20,0.4
+I012,B,2026-10-06,Rice,11,22,22,0.4
+I013,C,2026-10-05,Chicken,13,25,29,1.0
+I014,C,2026-10-05,Vegetables,12,22,25,0.9
+I015,C,2026-10-06,Chicken,14,26,30,1.1
+I016,C,2026-10-06,Rice,13,24,27,0.8

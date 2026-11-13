@@ -1,0 +1,17 @@
+sale_id,branch_id,sale_date,meal_period,item_name,quantity_sold
+S001,A,2026-10-05,Lunch,Chicken Pasta,42
+S002,A,2026-10-05,Lunch,Vegetable Noodles,28
+S003,A,2026-10-05,Lunch,Chicken Rice,35
+S004,A,2026-10-06,Lunch,Chicken Pasta,45
+S005,A,2026-10-06,Lunch,Vegetable Noodles,31
+S006,A,2026-10-06,Lunch,Chicken Rice,38
+S007,B,2026-10-05,Dinner,Chicken Curry,24
+S008,B,2026-10-05,Dinner,Vegetable Rice,18
+S009,B,2026-10-05,Dinner,Noodles,22
+S010,B,2026-10-06,Dinner,Chicken Curry,27
+S011,B,2026-10-06,Dinner,Vegetable Rice,21
+S012,B,2026-10-06,Dinner,Noodles,25
+S013,C,2026-10-05,Lunch,Chicken Pasta,19
+S014,C,2026-10-05,Dinner,Chicken Curry,17
+S015,C,2026-10-06,Lunch,Vegetable Noodles,23
+S016,C,2026-10-06,Dinner,Chicken Rice,20
