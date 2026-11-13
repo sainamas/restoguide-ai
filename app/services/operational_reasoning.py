@@ -7,109 +7,69 @@ def build_operational_reasoning_context(
     rag_evidence: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """
-    Combine structured PostgreSQL evidence with restaurant knowledge
-    retrieved through RAG.
+    Combine structured operational evidence with internal restaurant knowledge.
 
-    This layer does not generate an answer. It prepares grounded evidence
-    for a later reasoning component.
+    The reasoning remains evidence-based and deliberately avoids claiming
+    definitive causation from synthetic operational data.
     """
-
-    rag_evidence = rag_evidence or []
-
     observed_facts = _extract_observed_facts(operational_evidence)
-    knowledge_context = _extract_knowledge_context(rag_evidence)
+    knowledge = _extract_knowledge_context(rag_evidence or [])
+
     potential_contributors = _identify_potential_contributors(
         operational_evidence
     )
 
+    evidence_gaps = _identify_evidence_gaps(operational_evidence)
+
     return {
         "question": question,
         "observed_facts": observed_facts,
-        "restaurant_knowledge": knowledge_context,
+        "restaurant_knowledge": knowledge,
         "potential_contributors": potential_contributors,
-        "evidence_gaps": _identify_evidence_gaps(
-            operational_evidence,
-            rag_evidence,
-        ),
+        "evidence_gaps": evidence_gaps,
     }
 
 
 def _extract_observed_facts(
-    evidence: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Convert SQL results into explicit observed facts."""
+    operational_evidence: dict[str, Any],
+) -> list[str]:
+    """Convert SQL analysis results into readable observed facts."""
 
-    facts = []
+    facts: list[str] = []
 
-    waste_by_branch = evidence.get("waste_by_branch", [])
-
+    waste_by_branch = operational_evidence.get("waste_by_branch", [])
     if waste_by_branch:
-        highest_branch = waste_by_branch[0]
-
+        branch, waste = waste_by_branch[0]
         facts.append(
-            {
-                "type": "branch_waste",
-                "branch_id": highest_branch[0],
-                "waste_kg": float(highest_branch[1]),
-                "statement": (
-                    f"Branch {highest_branch[0]} has the highest recorded "
-                    f"food waste at {float(highest_branch[1]):.2f} kg."
-                ),
-            }
+            f"Branch {branch} has the highest recorded food waste at {waste} kg."
         )
 
-    preparation_vs_sales = evidence.get("preparation_vs_sales", [])
+    preparation_vs_sales = operational_evidence.get(
+        "preparation_vs_sales", []
+    )
 
-    for row in preparation_vs_sales:
-        branch_id, prepared, sold, remaining = row
-
+    for branch, prepared, sold, remaining in preparation_vs_sales:
         facts.append(
-            {
-                "type": "preparation_vs_sales",
-                "branch_id": branch_id,
-                "prepared": prepared,
-                "sold": sold,
-                "remaining": remaining,
-                "statement": (
-                    f"Branch {branch_id} prepared {prepared} units, sold "
-                    f"{sold} units, and had {remaining} units remaining."
-                ),
-            }
+            f"Branch {branch} prepared {prepared} units, sold {sold} units, "
+            f"and had {remaining} units remaining."
         )
 
-    inventory_spoilage = evidence.get("inventory_spoilage", [])
+    inventory_spoilage = operational_evidence.get(
+        "inventory_spoilage", []
+    )
 
-    for row in inventory_spoilage:
-        branch_id, spoilage = row
+    if inventory_spoilage:
+        for branch, spoilage in inventory_spoilage:
+            facts.append(
+                f"Branch {branch} recorded {spoilage} kg of inventory spoilage."
+            )
 
+    waste_by_reason = operational_evidence.get("waste_by_reason", [])
+
+    for branch, reason, amount in waste_by_reason:
         facts.append(
-            {
-                "type": "inventory_spoilage",
-                "branch_id": branch_id,
-                "spoilage_kg": float(spoilage),
-                "statement": (
-                    f"Branch {branch_id} recorded {float(spoilage):.2f} kg "
-                    "of inventory spoilage."
-                ),
-            }
-        )
-
-    waste_by_reason = evidence.get("waste_by_reason", [])
-
-    for row in waste_by_reason:
-        branch_id, reason, waste = row
-
-        facts.append(
-            {
-                "type": "waste_reason",
-                "branch_id": branch_id,
-                "reason": reason,
-                "waste_kg": float(waste),
-                "statement": (
-                    f"Branch {branch_id} recorded {float(waste):.2f} kg "
-                    f"of waste associated with '{reason}'."
-                ),
-            }
+            f"Branch {branch} recorded {amount} kg of waste associated with "
+            f"'{reason}'."
         )
 
     return facts
@@ -117,18 +77,27 @@ def _extract_observed_facts(
 
 def _extract_knowledge_context(
     rag_evidence: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Normalize RAG results into a trusted knowledge section."""
+) -> list[dict[str, str]]:
+    """Keep only the RAG evidence actually used by the reasoning layer."""
 
-    knowledge = []
+    knowledge: list[dict[str, str]] = []
 
     for item in rag_evidence:
+        title = item.get("title") or item.get("source") or "Unknown source"
+        content = (
+            item.get("content")
+            or item.get("text")
+            or item.get("snippet")
+            or ""
+        )
+
+        if not content.strip():
+            continue
+
         knowledge.append(
             {
-                "source": item.get("source"),
-                "title": item.get("title"),
-                "content": item.get("content", item.get("text", "")),
-                "source_type": "internal_restaurant_knowledge",
+                "source": title,
+                "content": content.strip(),
             }
         )
 
@@ -136,80 +105,138 @@ def _extract_knowledge_context(
 
 
 def _identify_potential_contributors(
-    evidence: dict[str, Any],
-) -> list[dict[str, Any]]:
+    operational_evidence: dict[str, Any],
+) -> list[str]:
     """
-    Identify relationships supported by the current operational data.
+    Identify operational factors that are consistent with the observed data.
 
-    These are hypotheses/potential contributors, not causal conclusions.
+    These are hypotheses, not causal conclusions.
     """
 
-    contributors = []
+    contributors: list[str] = []
 
-    waste_by_branch = evidence.get("waste_by_branch", [])
-    branch_summary = evidence.get("branch_summary", [])
+    branch_summary = operational_evidence.get("branch_summary", [])
 
-    if waste_by_branch and branch_summary:
-        highest_waste_branch = waste_by_branch[0][0]
-
-        branch_models = {
-            row[0]: {
-                "location_type": row[2],
-                "demand_pattern": row[3],
-                "staffing_model": row[4],
-                "inventory_model": row[5],
-                "preparation_model": row[6],
-            }
-            for row in branch_summary
+    branch_models = {
+        row[0]: {
+            "name": row[1],
+            "location_type": row[2],
+            "demand_pattern": row[3],
+            "staffing_model": row[4],
+            "inventory_model": row[5],
+            "preparation_model": row[6],
         }
+        for row in branch_summary
+        if len(row) >= 7
+    }
 
-        model = branch_models.get(highest_waste_branch)
+    preparation_vs_sales = {
+        row[0]: {
+            "prepared": row[1],
+            "sold": row[2],
+            "remaining": row[3],
+        }
+        for row in operational_evidence.get("preparation_vs_sales", [])
+        if len(row) >= 4
+    }
 
-        if model:
+    waste_by_branch = {
+        row[0]: float(row[1])
+        for row in operational_evidence.get("waste_by_branch", [])
+        if len(row) >= 2
+    }
+
+    inventory_spoilage = {
+        row[0]: float(row[1])
+        for row in operational_evidence.get("inventory_spoilage", [])
+        if len(row) >= 2
+    }
+
+    if "A" in branch_models and "B" in branch_models:
+        branch_a = branch_models["A"]
+        branch_b = branch_models["B"]
+
+        a_prep = preparation_vs_sales.get("A")
+        b_prep = preparation_vs_sales.get("B")
+
+        # Preparation model comparison
+        if (
+            a_prep
+            and b_prep
+            and branch_a["preparation_model"]
+            and branch_b["preparation_model"]
+        ):
+            if (
+                "large" in branch_a["preparation_model"].lower()
+                and "small" in branch_b["preparation_model"].lower()
+            ):
+                contributors.append(
+                    "Preparation strategy may be a contributor: Branch A uses "
+                    "large initial preparation batches, while Branch B uses "
+                    "smaller batches with replenishment. Branch A prepared "
+                    f"{a_prep['prepared']} units and had "
+                    f"{a_prep['remaining']} units remaining, compared with "
+                    f"{b_prep['prepared']} prepared and "
+                    f"{b_prep['remaining']} remaining in Branch B."
+                )
+
+        # Inventory model comparison
+        if "inventory_model" in branch_a and "inventory_model" in branch_b:
+            if (
+                "minimum stock" in branch_a["inventory_model"].lower()
+                and "demand-based" in branch_b["inventory_model"].lower()
+            ):
+                if (
+                    "A" in inventory_spoilage
+                    and "B" in inventory_spoilage
+                ):
+                    contributors.append(
+                        "Inventory strategy may also contribute: Branch A uses "
+                        "minimum-stock-based inventory and recorded "
+                        f"{inventory_spoilage['A']:.2f} kg of spoilage, while "
+                        f"Branch B uses demand-based purchasing and recorded "
+                        f"{inventory_spoilage['B']:.2f} kg."
+                    )
+
+        # Demand/staffing model comparison
+        if (
+            branch_a["staffing_model"]
+            and branch_b["staffing_model"]
+            and branch_a["demand_pattern"]
+            and branch_b["demand_pattern"]
+        ):
             contributors.append(
-                {
-                    "branch_id": highest_waste_branch,
-                    "status": "potential_contributor",
-                    "factors": [
-                        model["preparation_model"],
-                        model["inventory_model"],
-                        model["staffing_model"],
-                    ],
-                    "reason": (
-                        f"Branch {highest_waste_branch}'s operating model "
-                        "contains preparation, inventory, and staffing "
-                        "characteristics that may contribute to its "
-                        "observed waste pattern."
-                    ),
-                }
+                "Demand-response practices differ between the branches: "
+                f"Branch A has {branch_a['demand_pattern'].lower()} and uses "
+                f"{branch_a['staffing_model'].lower()}, while Branch B has "
+                f"{branch_b['demand_pattern'].lower()} and uses "
+                f"{branch_b['staffing_model'].lower()}. This difference may "
+                "affect how preparation quantities are planned."
             )
+
+    if waste_by_branch.get("A", 0) > waste_by_branch.get("B", 0):
+        contributors.append(
+            "The observed waste pattern is substantially higher in Branch A "
+            "than Branch B, so the differences in their operating models are "
+            "relevant factors to investigate."
+        )
 
     return contributors
 
 
 def _identify_evidence_gaps(
     operational_evidence: dict[str, Any],
-    rag_evidence: list[dict[str, Any]],
 ) -> list[str]:
-    """Identify information that is not currently supported."""
+    """State what the available data cannot establish."""
 
-    gaps = []
+    gaps = [
+        "Detailed item-level sales evidence is not currently included.",
+        "The available data supports association, not definitive causation.",
+    ]
 
-    if not operational_evidence:
-        gaps.append("No operational database evidence was available.")
-
-    if not rag_evidence:
+    if not operational_evidence.get("preparation_vs_sales"):
         gaps.append(
-            "No relevant internal restaurant knowledge was retrieved."
+            "Preparation and sales quantities are not available for comparison."
         )
-
-    if not operational_evidence.get("sales"):
-        gaps.append(
-            "Detailed item-level sales evidence is not currently included."
-        )
-
-    gaps.append(
-        "The available data supports association, not definitive causation."
-    )
 
     return gaps

@@ -10,6 +10,10 @@ from langgraph.graph import END, StateGraph
 from sentence_transformers import SentenceTransformer
 
 from app.services.documents import load_file
+from app.services.operational_analysis import get_operational_evidence
+from app.services.operational_reasoning import (
+    build_operational_reasoning_context,
+)
 
 
 class State(TypedDict, total=False):
@@ -20,6 +24,10 @@ class State(TypedDict, total=False):
     answer: str
     sources: list[dict]
     route: str
+
+    operational: bool
+    operational_evidence: dict
+    reasoning_context: dict
 
 
 class Engine:
@@ -60,7 +68,13 @@ class Engine:
         for path in Path(folder).rglob("*"):
             if (
                 path.is_file()
-                and path.suffix.lower() in {".pdf", ".docx", ".txt", ".md"}
+                and path.suffix.lower()
+                in {
+                    ".pdf",
+                    ".docx",
+                    ".txt",
+                    ".md",
+                }
             ):
                 docs += load_file(path)
 
@@ -273,12 +287,63 @@ class Engine:
 
         return len(docs)
 
+    def _is_operational_question(self, question):
+        """
+        Detect whether the question requires structured
+        restaurant operational data.
+
+        This is intentionally conservative. Questions that
+        clearly ask about waste, sales, preparation, inventory,
+        purchasing, or branch performance are routed to the
+        operational evidence path.
+        """
+
+        operational_terms = {
+            "waste",
+            "wasted",
+            "food waste",
+            "sales",
+            "sold",
+            "selling",
+            "preparation",
+            "prepared",
+            "inventory",
+            "stock",
+            "spoilage",
+            "purchase",
+            "purchases",
+            "branch",
+            "branches",
+            "performance",
+            "demand",
+            "remaining",
+            "over-preparation",
+        }
+
+        normalized = question.lower()
+
+        return any(
+            term in normalized
+            for term in operational_terms
+        )
+
     def _build(self):
         graph = StateGraph(State)
 
+        def classify_question(state):
+            question = state["question"]
+
+            return {
+                "operational": self._is_operational_question(
+                    question
+                )
+            }
+
         def retrieve_node(state):
             return {
-                "hits": self.retrieve(state["question"])
+                "hits": self.retrieve(
+                    state["question"]
+                )
             }
 
         def grade(state):
@@ -304,6 +369,44 @@ class Engine:
                 )
             }
 
+        def operational_data_node(state):
+            return {
+                "operational_evidence": (
+                    get_operational_evidence()
+                )
+            }
+
+        def operational_rag_node(state):
+            return {
+                "hits": self.retrieve(
+                    state["question"]
+                )
+            }
+
+        def operational_context_node(state):
+            return {
+                "reasoning_context": (
+                    build_operational_reasoning_context(
+                        question=state["question"],
+                        operational_evidence=(
+                            state["operational_evidence"]
+                        ),
+                        rag_evidence=state.get(
+                            "hits",
+                            [],
+                        ),
+                    )
+                )
+            }
+
+        def operational_answer(state):
+            context = state["reasoning_context"]
+
+            return self._answer_operational(
+                state["question"],
+                context,
+            )
+
         def answer_internal(state):
             hits = [
                 hit
@@ -324,6 +427,11 @@ class Engine:
                 state.get("web", []),
                 "web",
             )
+
+        graph.add_node(
+            "classify",
+            classify_question,
+        )
 
         graph.add_node(
             "retrieve",
@@ -350,7 +458,60 @@ class Engine:
             answer_web,
         )
 
-        graph.set_entry_point("retrieve")
+        graph.add_node(
+            "operational_data",
+            operational_data_node,
+        )
+
+        graph.add_node(
+            "operational_rag",
+            operational_rag_node,
+        )
+
+        graph.add_node(
+            "operational_context",
+            operational_context_node,
+        )
+
+        graph.add_node(
+            "operational_answer",
+            operational_answer,
+        )
+
+        graph.set_entry_point("classify")
+
+        graph.add_conditional_edges(
+            "classify",
+            lambda state: (
+                "operational"
+                if state["operational"]
+                else "rag"
+            ),
+            {
+                "operational": "operational_data",
+                "rag": "retrieve",
+            },
+        )
+
+        graph.add_edge(
+            "operational_data",
+            "operational_rag",
+        )
+
+        graph.add_edge(
+            "operational_rag",
+            "operational_context",
+        )
+
+        graph.add_edge(
+            "operational_context",
+            "operational_answer",
+        )
+
+        graph.add_edge(
+            "operational_answer",
+            END,
+        )
 
         graph.add_edge(
             "retrieve",
@@ -386,6 +547,100 @@ class Engine:
         )
 
         return graph.compile()
+
+    def _answer_operational(
+        self,
+        question,
+        context,
+    ):
+        facts = context.get(
+            "observed_facts",
+            [],
+        )
+
+        knowledge = context.get(
+            "restaurant_knowledge",
+            [],
+        )
+
+        contributors = context.get(
+            "potential_contributors",
+            [],
+        )
+
+        gaps = context.get(
+            "evidence_gaps",
+            [],
+        )
+
+        sections = [
+            "Operational analysis for: "
+            + question,
+            "",
+            "Observed operational evidence:",
+        ]
+
+        if facts:
+            sections.extend(
+                f"- {fact}"
+                for fact in facts
+            )
+        else:
+            sections.append(
+                "- No operational evidence was found."
+            )
+
+        sections.append(
+            "\nRelevant internal restaurant knowledge:"
+        )
+
+        if knowledge:
+            for item in knowledge[:3]:
+                sections.append(
+                    f"- {item.get('title') or item.get('source')}: "
+                    f"{item.get('content', '')[:500]}"
+                )
+        else:
+            sections.append(
+                "- No relevant internal knowledge was retrieved."
+            )
+
+        sections.append(
+            "\nPotential contributors:"
+        )
+        if contributors:
+           for contributor in contributors:
+                sections.append(
+                    f"- {contributor}"
+            )
+        else:
+         sections.append(
+                   "- No potential contributor was identified "
+                   "from the current evidence."
+            )
+       
+        
+
+        sections.append(
+            "\nEvidence limitation:"
+        )
+
+        sections.extend(
+            f"- {gap}"
+            for gap in gaps
+        )
+
+        return {
+            "answer": "\n".join(sections),
+            "sources": knowledge,
+            "route": "operational",
+            "operational_evidence": (
+                context.get(
+                    "observed_facts",
+                    [],
+                )
+            ),
+        }
 
     def _answer(self, state, hits, route):
         if not hits:

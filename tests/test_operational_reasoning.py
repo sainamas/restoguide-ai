@@ -57,76 +57,92 @@ def sample_operational_evidence():
     }
 
 
-def test_build_reasoning_context_contains_question():
-    context = build_operational_reasoning_context(
-        "Why is Branch A generating more food waste?",
+def test_reasoning_contains_question():
+    result = build_operational_reasoning_context(
+        "Why is food waste higher in Branch A than Branch B?",
         sample_operational_evidence(),
     )
 
     assert (
-        context["question"]
-        == "Why is Branch A generating more food waste?"
+        result["question"]
+        == "Why is food waste higher in Branch A than Branch B?"
     )
 
 
-def test_context_contains_observed_facts():
-    context = build_operational_reasoning_context(
-        "Why is Branch A generating more food waste?",
+def test_reasoning_contains_observed_facts():
+    result = build_operational_reasoning_context(
+        "Why is food waste higher in Branch A than Branch B?",
         sample_operational_evidence(),
     )
 
-    assert context["observed_facts"]
-    assert any(
-        fact["branch_id"] == "A"
-        and fact["waste_kg"] == 24.20
-        for fact in context["observed_facts"]
-    )
+    facts = " ".join(result["observed_facts"])
+
+    assert "24.2" in facts
+    assert "294" in facts
+    assert "219" in facts
+    assert "75" in facts
+    assert "10.5" in facts
 
 
-def test_context_contains_potential_contributor():
-    context = build_operational_reasoning_context(
-        "Why is Branch A generating more food waste?",
+def test_reasoning_identifies_preparation_contributor():
+    result = build_operational_reasoning_context(
+        "Why is food waste higher in Branch A than Branch B?",
         sample_operational_evidence(),
     )
 
-    contributors = context["potential_contributors"]
+    contributors = " ".join(result["potential_contributors"]).lower()
 
-    assert contributors
-    assert contributors[0]["branch_id"] == "A"
-    assert contributors[0]["status"] == "potential_contributor"
+    assert "large initial preparation batches" in contributors
+    assert "smaller batches with replenishment" in contributors
+    assert "294" in contributors
+    assert "75" in contributors
 
 
-def test_rag_evidence_is_marked_as_internal_knowledge():
+def test_reasoning_identifies_inventory_contributor():
+    result = build_operational_reasoning_context(
+        "Why is food waste higher in Branch A than Branch B?",
+        sample_operational_evidence(),
+    )
+
+    contributors = " ".join(result["potential_contributors"]).lower()
+
+    assert "minimum-stock" in contributors
+    assert "10.50 kg" in contributors
+    assert "2.80 kg" in contributors
+
+
+def test_reasoning_avoids_definitive_causality():
+    result = build_operational_reasoning_context(
+        "Why is food waste higher in Branch A than Branch B?",
+        sample_operational_evidence(),
+    )
+
+    gaps = " ".join(result["evidence_gaps"]).lower()
+
+    assert "association" in gaps
+    assert "causation" in gaps
+
+
+def test_rag_sources_are_preserved():
     rag_evidence = [
         {
-            "source": "data/knowledge_base/kitchen_sops/batch_preparation.md",
-            "title": "Batch Preparation SOP",
-            "content": "Branch A uses larger initial preparation batches.",
-        }
+            "title": "POL-003_waste.md",
+            "content": "Prepare ingredients according to service needs.",
+        },
+        {
+            "title": "SOP-006_closing.md",
+            "content": "Handle retained food under approved storage policy.",
+        },
     ]
 
-    context = build_operational_reasoning_context(
-        "Why is Branch A generating more food waste?",
+    result = build_operational_reasoning_context(
+        "Why is food waste higher in Branch A than Branch B?",
         sample_operational_evidence(),
         rag_evidence,
     )
 
-    knowledge = context["restaurant_knowledge"]
+    sources = result["restaurant_knowledge"]
 
-    assert len(knowledge) == 1
-    assert knowledge[0]["source_type"] == (
-        "internal_restaurant_knowledge"
-    )
-
-
-def test_causality_is_explicitly_limited():
-    context = build_operational_reasoning_context(
-        "Why is Branch A generating more food waste?",
-        sample_operational_evidence(),
-    )
-
-    assert any(
-        "association" in gap.lower()
-        and "causation" in gap.lower()
-        for gap in context["evidence_gaps"]
-    )
+    assert len(sources) == 2
+    assert sources[0]["source"] == "POL-003_waste.md"
+    assert sources[1]["source"] == "SOP-006_closing.md"
