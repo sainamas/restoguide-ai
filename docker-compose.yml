@@ -15,5 +15,19 @@ services:
     volumes:
       - restoguide_postgres_data:/var/lib/postgresql/data
 
+  api:
+    build: .
+    container_name: restoguide-api
+    restart: unless-stopped
+
+    environment:
+      DATABASE_URL: postgresql://restoguide:restoguide_dev_password@postgres:5432/restoguide
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      - postgres
+
 volumes:
   restoguide_postgres_data:
