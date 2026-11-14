@@ -14,6 +14,9 @@ from app.services.operational_analysis import get_operational_evidence
 from app.services.operational_reasoning import (
     build_operational_reasoning_context,
 )
+from app.services.operational_recommendations import (
+    build_operational_recommendations,
+)
 
 
 class State(TypedDict, total=False):
@@ -28,6 +31,7 @@ class State(TypedDict, total=False):
     operational: bool
     operational_evidence: dict
     reasoning_context: dict
+    recommendations: list[str]
 
 
 class Engine:
@@ -59,7 +63,9 @@ class Engine:
         if index_path.exists() and metadata_path.exists():
             self.index = faiss.read_index(str(index_path))
             self.docs = json.loads(
-                metadata_path.read_text(encoding="utf-8")
+                metadata_path.read_text(
+                    encoding="utf-8"
+                )
             )
 
     def rebuild(self, folder):
@@ -89,7 +95,9 @@ class Engine:
             normalize_embeddings=True,
         ).astype("float32")
 
-        self.index = faiss.IndexFlatIP(vectors.shape[1])
+        self.index = faiss.IndexFlatIP(
+            vectors.shape[1]
+        )
         self.index.add(vectors)
 
         faiss.write_index(
@@ -98,14 +106,24 @@ class Engine:
         )
 
         (self.folder / "docs.json").write_text(
-            json.dumps(docs, ensure_ascii=False),
+            json.dumps(
+                docs,
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
 
         return len(docs)
 
-    def _title_match_score(self, question, document):
-        text = document.get("text", "")
+    def _title_match_score(
+        self,
+        question,
+        document,
+    ):
+        text = document.get(
+            "text",
+            "",
+        )
 
         first_line = next(
             (
@@ -116,7 +134,11 @@ class Engine:
             "",
         )
 
-        title = re.sub(r"^#+\s*", "", first_line)
+        title = re.sub(
+            r"^#+\s*",
+            "",
+            first_line,
+        )
 
         title = re.split(
             r"\bCategory\s*:",
@@ -148,11 +170,17 @@ class Engine:
         }
 
         question_words = set(
-            re.findall(r"[a-z0-9]+", question.lower())
+            re.findall(
+                r"[a-z0-9]+",
+                question.lower(),
+            )
         )
 
         title_words = set(
-            re.findall(r"[a-z0-9]+", title.lower())
+            re.findall(
+                r"[a-z0-9]+",
+                title.lower(),
+            )
         )
 
         question_words -= stop_words
@@ -161,7 +189,10 @@ class Engine:
         if not title_words:
             return 0.0
 
-        return len(question_words & title_words) / len(title_words)
+        return (
+            len(question_words & title_words)
+            / len(title_words)
+        )
 
     def retrieve(self, q):
         """
@@ -182,26 +213,42 @@ class Engine:
 
         scores, ids = self.index.search(
             vector,
-            min(self.k, len(self.docs)),
+            min(
+                self.k,
+                len(self.docs),
+            ),
         )
 
         results = []
 
-        for score, doc_id in zip(scores[0], ids[0]):
+        for score, doc_id in zip(
+            scores[0],
+            ids[0],
+        ):
             if doc_id < 0:
                 continue
 
-            document = self.docs[int(doc_id)]
+            document = self.docs[
+                int(doc_id)
+            ]
 
-            semantic_score = float(score)
+            semantic_score = float(
+                score
+            )
 
-            title_score = self._title_match_score(
-                q,
-                document,
+            title_score = (
+                self._title_match_score(
+                    q,
+                    document,
+                )
             )
 
             relevance_score = (
-                semantic_score + (0.20 * title_score)
+                semantic_score
+                + (
+                    0.20
+                    * title_score
+                )
             )
 
             results.append(
@@ -214,7 +261,9 @@ class Engine:
             )
 
         results.sort(
-            key=lambda item: item["relevance_score"],
+            key=lambda item: item[
+                "relevance_score"
+            ],
             reverse=True,
         )
 
@@ -241,7 +290,10 @@ class Engine:
                             "title",
                             "Web result",
                         ),
-                        "url": result.get("href", ""),
+                        "url": result.get(
+                            "href",
+                            "",
+                        ),
                         "source_type": "external",
                         "score": None,
                     }
@@ -252,7 +304,9 @@ class Engine:
                 ]
 
         except Exception as e:
-            print(f"Web search error: {e}")
+            print(
+                f"Web search error: {e}"
+            )
             return []
 
     def rebuild_from_documents(self, docs):
@@ -272,22 +326,36 @@ class Engine:
             normalize_embeddings=True,
         ).astype("float32")
 
-        self.index = faiss.IndexFlatIP(vectors.shape[1])
+        self.index = faiss.IndexFlatIP(
+            vectors.shape[1]
+        )
         self.index.add(vectors)
 
         faiss.write_index(
             self.index,
-            str(self.folder / "index.faiss"),
+            str(
+                self.folder
+                / "index.faiss"
+            ),
         )
 
-        (self.folder / "docs.json").write_text(
-            json.dumps(docs, ensure_ascii=False),
+        (
+            self.folder
+            / "docs.json"
+        ).write_text(
+            json.dumps(
+                docs,
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
 
         return len(docs)
 
-    def _is_operational_question(self, question):
+    def _is_operational_question(
+        self,
+        question,
+    ):
         """
         Detect whether the question requires structured
         restaurant operational data.
@@ -327,6 +395,34 @@ class Engine:
             for term in operational_terms
         )
 
+    def _extract_branch_ids(
+        self,
+        question,
+    ):
+        """
+        Extract branch identifiers such as A, B, or C
+        from an operational question.
+
+        Example:
+            "Why is waste higher in Branch A than Branch B?"
+
+        returns:
+            ["A", "B"]
+        """
+
+        matches = re.findall(
+            r"\bbranch\s+([A-Za-z])\b",
+            question,
+            flags=re.IGNORECASE,
+        )
+
+        return list(
+            dict.fromkeys(
+                match.upper()
+                for match in matches
+            )
+        )
+
     def _build(self):
         graph = StateGraph(State)
 
@@ -334,8 +430,10 @@ class Engine:
             question = state["question"]
 
             return {
-                "operational": self._is_operational_question(
-                    question
+                "operational": (
+                    self._is_operational_question(
+                        question
+                    )
                 )
             }
 
@@ -349,12 +447,16 @@ class Engine:
         def grade(state):
             sufficient_evidence = bool(
                 state.get("hits")
-                and state["hits"][0]["relevance_score"]
+                and state["hits"][0][
+                    "relevance_score"
+                ]
                 >= self.threshold
             )
 
             return {
-                "use_web": not sufficient_evidence,
+                "use_web": (
+                    not sufficient_evidence
+                ),
                 "route": (
                     "internal"
                     if sufficient_evidence
@@ -384,35 +486,101 @@ class Engine:
             }
 
         def operational_context_node(state):
+            """
+            Combine structured operational evidence
+            with relevant internal restaurant knowledge.
+
+            IMPORTANT:
+            All state access happens inside this node.
+            This prevents the NameError that occurred when
+            state[...] was referenced directly inside _build().
+            """
+
+            context = (
+                build_operational_reasoning_context(
+                    question=state[
+                        "question"
+                    ],
+                    operational_evidence=(
+                        state[
+                            "operational_evidence"
+                        ]
+                    ),
+                    rag_evidence=state.get(
+                        "hits",
+                        [],
+                    ),
+                )
+            )
+
             return {
-                "reasoning_context": (
-                    build_operational_reasoning_context(
-                        question=state["question"],
-                        operational_evidence=(
-                            state["operational_evidence"]
-                        ),
-                        rag_evidence=state.get(
-                            "hits",
-                            [],
-                        ),
-                    )
+                "reasoning_context": context
+            }
+
+        def operational_recommendations_node(
+            state
+        ):
+            """
+            Generate operational recommendations.
+
+            If the question explicitly mentions branches,
+            recommendations are restricted to those branches.
+
+            Example:
+                Branch A vs Branch B
+                -> recommendations only for A and B
+            """
+
+            target_branches = (
+                self._extract_branch_ids(
+                    state["question"]
+                )
+            )
+
+            recommendations = (
+                build_operational_recommendations(
+                    state[
+                        "operational_evidence"
+                    ],
+                    target_branches=(
+                        target_branches
+                    ),
+                )
+            )
+
+            return {
+                "recommendations": (
+                    recommendations
                 )
             }
 
-        def operational_answer(state):
-            context = state["reasoning_context"]
-
+        def operational_answer(
+            state
+        ):
             return self._answer_operational(
-                state["question"],
-                context,
+                question=state[
+                    "question"
+                ],
+                context=state[
+                    "reasoning_context"
+                ],
+                recommendations=state.get(
+                    "recommendations",
+                    [],
+                ),
             )
 
-        def answer_internal(state):
+        def answer_internal(
+            state
+        ):
             hits = [
                 hit
-                for hit in state["hits"]
-                if hit["relevance_score"]
-                >= self.threshold
+                for hit in state[
+                    "hits"
+                ]
+                if hit[
+                    "relevance_score"
+                ] >= self.threshold
             ]
 
             return self._answer(
@@ -421,12 +589,21 @@ class Engine:
                 "internal",
             )
 
-        def answer_web(state):
+        def answer_web(
+            state
+        ):
             return self._answer(
                 state,
-                state.get("web", []),
+                state.get(
+                    "web",
+                    [],
+                ),
                 "web",
             )
+
+        # -------------------------
+        # Standard RAG nodes
+        # -------------------------
 
         graph.add_node(
             "classify",
@@ -458,6 +635,10 @@ class Engine:
             answer_web,
         )
 
+        # -------------------------
+        # Operational nodes
+        # -------------------------
+
         graph.add_node(
             "operational_data",
             operational_data_node,
@@ -474,24 +655,47 @@ class Engine:
         )
 
         graph.add_node(
+            "operational_recommendations",
+            operational_recommendations_node,
+        )
+
+        graph.add_node(
             "operational_answer",
             operational_answer,
         )
 
-        graph.set_entry_point("classify")
+        # -------------------------
+        # Entry point
+        # -------------------------
+
+        graph.set_entry_point(
+            "classify"
+        )
+
+        # -------------------------
+        # Routing
+        # -------------------------
 
         graph.add_conditional_edges(
             "classify",
             lambda state: (
                 "operational"
-                if state["operational"]
+                if state[
+                    "operational"
+                ]
                 else "rag"
             ),
             {
-                "operational": "operational_data",
-                "rag": "retrieve",
+                "operational":
+                    "operational_data",
+                "rag":
+                    "retrieve",
             },
         )
+
+        # -------------------------
+        # Operational workflow
+        # -------------------------
 
         graph.add_edge(
             "operational_data",
@@ -505,6 +709,11 @@ class Engine:
 
         graph.add_edge(
             "operational_context",
+            "operational_recommendations",
+        )
+
+        graph.add_edge(
+            "operational_recommendations",
             "operational_answer",
         )
 
@@ -512,6 +721,10 @@ class Engine:
             "operational_answer",
             END,
         )
+
+        # -------------------------
+        # Standard RAG workflow
+        # -------------------------
 
         graph.add_edge(
             "retrieve",
@@ -526,8 +739,10 @@ class Engine:
                 else "internal_answer"
             ),
             {
-                "search": "search",
-                "internal_answer": "internal_answer",
+                "search":
+                    "search",
+                "internal_answer":
+                    "internal_answer",
             },
         )
 
@@ -552,6 +767,7 @@ class Engine:
         self,
         question,
         context,
+        recommendations=None,
     ):
         facts = context.get(
             "observed_facts",
@@ -573,9 +789,15 @@ class Engine:
             [],
         )
 
+        recommendations = (
+            recommendations or []
+        )
+
         sections = [
-            "Operational analysis for: "
-            + question,
+            (
+                "Operational analysis for: "
+                + question
+            ),
             "",
             "Observed operational evidence:",
         ]
@@ -587,51 +809,82 @@ class Engine:
             )
         else:
             sections.append(
-                "- No operational evidence was found."
+                "- No operational evidence "
+                "was found."
             )
 
         sections.append(
-            "\nRelevant internal restaurant knowledge:"
+            "\nRelevant internal "
+            "restaurant knowledge:"
         )
 
         if knowledge:
             for item in knowledge[:3]:
                 sections.append(
-                    f"- {item.get('title') or item.get('source')}: "
-                    f"{item.get('content', '')[:500]}"
+                    (
+                        f"- "
+                        f"{item.get('title') or item.get('source')}: "
+                        f"{item.get('content', '')[:500]}"
+                    )
                 )
         else:
             sections.append(
-                "- No relevant internal knowledge was retrieved."
+                "- No relevant internal "
+                "knowledge was retrieved."
             )
 
         sections.append(
             "\nPotential contributors:"
         )
+
         if contributors:
-           for contributor in contributors:
-                sections.append(
-                    f"- {contributor}"
+            sections.extend(
+                f"- {contributor}"
+                for contributor in contributors
             )
         else:
-         sections.append(
-                   "- No potential contributor was identified "
-                   "from the current evidence."
+            sections.append(
+                "- No potential contributor "
+                "was identified from the "
+                "current evidence."
             )
-       
-        
+
+        sections.append(
+            "\nRecommended actions:"
+        )
+
+        if recommendations:
+            sections.extend(
+                f"- {recommendation}"
+                for recommendation in (
+                    recommendations
+                )
+            )
+        else:
+            sections.append(
+                "- No specific operational "
+                "recommendation was generated."
+            )
 
         sections.append(
             "\nEvidence limitation:"
         )
 
-        sections.extend(
-            f"- {gap}"
-            for gap in gaps
-        )
+        if gaps:
+            sections.extend(
+                f"- {gap}"
+                for gap in gaps
+            )
+        else:
+            sections.append(
+                "- No additional evidence "
+                "limitation was identified."
+            )
 
         return {
-            "answer": "\n".join(sections),
+            "answer": "\n".join(
+                sections
+            ),
             "sources": knowledge,
             "route": "operational",
             "operational_evidence": (
@@ -640,24 +893,36 @@ class Engine:
                     [],
                 )
             ),
+            "recommendations": (
+                recommendations
+            ),
         }
 
-    def _answer(self, state, hits, route):
+    def _answer(
+        self,
+        state,
+        hits,
+        route,
+    ):
         if not hits:
             message = (
-                "I could not find sufficiently relevant evidence. "
-                "Please check with an authorised manager."
+                "I could not find sufficiently "
+                "relevant evidence. Please check "
+                "with an authorised manager."
             )
 
         elif route == "internal":
-            details = "\n\n---\n\n".join(
-                item["text"][:1000]
-                for item in hits[:3]
+            details = (
+                "\n\n---\n\n".join(
+                    item["text"][:1000]
+                    for item in hits[:3]
+                )
             )
 
             message = (
-                "Information retrieved from internal "
-                "restaurant documents:\n\n"
+                "Information retrieved from "
+                "internal restaurant documents:"
+                "\n\n"
                 + details
             )
 
@@ -674,13 +939,17 @@ class Engine:
                 )
 
                 description = (
-                    hit.get("text", "")
-                    .strip()
+                    hit.get(
+                        "text",
+                        "",
+                    ).strip()
                 )
 
                 url = (
-                    hit.get("url", "")
-                    .strip()
+                    hit.get(
+                        "url",
+                        "",
+                    ).strip()
                 )
 
                 section = (
@@ -693,14 +962,18 @@ class Engine:
                         f"\nSource: {url}"
                     )
 
-                result_sections.append(section)
+                result_sections.append(
+                    section
+                )
 
             message = (
                 "No sufficient internal evidence "
                 "was found.\n\n"
                 "External web information "
-                "(not approved restaurant procedures):\n\n"
-                + "\n\n---\n\n".join(
+                "(not approved restaurant "
+                "procedures):\n\n"
+                +
+                "\n\n---\n\n".join(
                     result_sections
                 )
             )
@@ -713,5 +986,7 @@ class Engine:
 
     def ask(self, q):
         return self._build().invoke(
-            {"question": q}
+            {
+                "question": q
+            }
         )
