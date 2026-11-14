@@ -1,0 +1,17 @@
+waste_id,branch_id,waste_date,meal_period,item_name,waste_quantity_kg,waste_reason
+W001,A,2026-10-05,Lunch,Chicken Pasta,4.5,Over-preparation
+W002,A,2026-10-05,Lunch,Vegetable Noodles,3.2,Over-preparation
+W003,A,2026-10-05,Lunch,Chicken Rice,4.0,Over-preparation
+W004,A,2026-10-06,Lunch,Chicken Pasta,4.8,Over-preparation
+W005,A,2026-10-06,Lunch,Vegetable Noodles,3.5,Over-preparation
+W006,A,2026-10-06,Lunch,Chicken Rice,4.2,Over-preparation
+W007,B,2026-10-05,Dinner,Chicken Curry,1.2,Unsold prepared food
+W008,B,2026-10-05,Dinner,Vegetable Rice,0.9,Unsold prepared food
+W009,B,2026-10-05,Dinner,Noodles,1.0,Unsold prepared food
+W010,B,2026-10-06,Dinner,Chicken Curry,1.0,Unsold prepared food
+W011,B,2026-10-06,Dinner,Vegetable Rice,0.8,Unsold prepared food
+W012,B,2026-10-06,Dinner,Noodles,0.9,Unsold prepared food
+W013,C,2026-10-05,Lunch,Chicken Pasta,2.0,Demand uncertainty
+W014,C,2026-10-05,Dinner,Chicken Curry,1.8,Demand uncertainty
+W015,C,2026-10-06,Lunch,Vegetable Noodles,2.3,Demand uncertainty
+W016,C,2026-10-06,Dinner,Chicken Rice,2.1,Demand uncertainty

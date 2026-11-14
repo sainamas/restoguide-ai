@@ -1,0 +1,17 @@
+preparation_id,branch_id,prep_date,meal_period,item_name,quantity_prepared,quantity_sold,remaining_quantity
+P001,A,2026-10-05,Lunch,Chicken Pasta,55,42,13
+P002,A,2026-10-05,Lunch,Vegetable Noodles,40,28,12
+P003,A,2026-10-05,Lunch,Chicken Rice,48,35,13
+P004,A,2026-10-06,Lunch,Chicken Pasta,58,45,13
+P005,A,2026-10-06,Lunch,Vegetable Noodles,43,31,12
+P006,A,2026-10-06,Lunch,Chicken Rice,50,38,12
+P007,B,2026-10-05,Dinner,Chicken Curry,28,24,4
+P008,B,2026-10-05,Dinner,Vegetable Rice,22,18,4
+P009,B,2026-10-05,Dinner,Noodles,25,22,3
+P010,B,2026-10-06,Dinner,Chicken Curry,30,27,3
+P011,B,2026-10-06,Dinner,Vegetable Rice,24,21,3
+P012,B,2026-10-06,Dinner,Noodles,28,25,3
+P013,C,2026-10-05,Lunch,Chicken Pasta,25,19,6
+P014,C,2026-10-05,Dinner,Chicken Curry,23,17,6
+P015,C,2026-10-06,Lunch,Vegetable Noodles,30,23,7
+P016,C,2026-10-06,Dinner,Chicken Rice,27,20,7

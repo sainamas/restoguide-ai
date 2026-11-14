@@ -1,0 +1,4 @@
+branch_id,branch_name,location_type,cuisine_focus,demand_pattern,staffing_model,inventory_model,preparation_model
+A,Branch A,City Centre,Continental and Asian,High weekday lunch demand,Fixed staffing based on expected peak demand,Minimum stock based inventory,Large initial preparation batches
+B,Branch B,Residential,Asian,Strong evening and weekend demand,Demand-adjusted staffing,Demand-based purchasing,Smaller batches with replenishment
+C,Branch C,Tourist Area,Mixed cuisine,Highly variable demand,Forecast-adjusted staffing,Moderate stock with forecast-based purchasing,Forecast-based preparation

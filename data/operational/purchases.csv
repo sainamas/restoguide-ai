@@ -1,0 +1,17 @@
+purchase_id,branch_id,purchase_date,item_name,quantity_kg,supplier_category,unit_cost
+PU001,A,2026-10-05,Chicken,35,Local Supplier,5.20
+PU002,A,2026-10-05,Vegetables,28,Local Supplier,2.10
+PU003,A,2026-10-05,Rice,30,Wholesale Supplier,1.40
+PU004,A,2026-10-06,Chicken,36,Local Supplier,5.20
+PU005,A,2026-10-06,Vegetables,30,Local Supplier,2.10
+PU006,A,2026-10-06,Rice,32,Wholesale Supplier,1.40
+PU007,B,2026-10-05,Chicken,22,Local Supplier,5.10
+PU008,B,2026-10-05,Vegetables,18,Local Supplier,2.00
+PU009,B,2026-10-05,Rice,20,Wholesale Supplier,1.35
+PU010,B,2026-10-06,Chicken,24,Local Supplier,5.10
+PU011,B,2026-10-06,Vegetables,19,Local Supplier,2.00
+PU012,B,2026-10-06,Rice,22,Wholesale Supplier,1.35
+PU013,C,2026-10-05,Chicken,25,Local Supplier,5.15
+PU014,C,2026-10-05,Vegetables,22,Local Supplier,2.05
+PU015,C,2026-10-06,Chicken,26,Local Supplier,5.15
+PU016,C,2026-10-06,Rice,24,Wholesale Supplier,1.38
