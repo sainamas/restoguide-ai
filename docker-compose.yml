@@ -7,10 +7,16 @@ services:
     environment:
       POSTGRES_DB: restoguide
       POSTGRES_USER: restoguide
-      POSTGRES_PASSWORD: restoguide_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     ports:
       - "5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restoguide -d restoguide"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
     volumes:
       - restoguide_postgres_data:/var/lib/postgresql/data
@@ -21,7 +27,7 @@ services:
     restart: unless-stopped
 
     environment:
-      DATABASE_URL: postgresql://restoguide:restoguide_dev_password@postgres:5432/restoguide
+      DATABASE_URL: ${DATABASE_URL}
 
     ports:
       - "8000:8000"
