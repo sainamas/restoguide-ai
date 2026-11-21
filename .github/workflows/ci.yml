@@ -8,6 +8,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: restoguide
+          POSTGRES_PASSWORD: restoguide_dev_password
+          POSTGRES_DB: restoguide
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restoguide -d restoguide"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,5 +35,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Initialize operational database
+        env:
+          DATABASE_URL: postgresql://restoguide:restoguide_dev_password@localhost:5432/restoguide
+        run: |
+          python -c "from app.services.operational_db import initialize_schema; initialize_schema()"
+          python -m app.services.operational_loader
+
       - name: Run tests
+        env:
+          DATABASE_URL: postgresql://restoguide:restoguide_dev_password@localhost:5432/restoguide
         run: python -m pytest -q
