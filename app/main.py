@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.rag.engine import Engine
-from app.services.database import init_db, save, history
+from app.services.database import init_db, save, history, add_feedback
 from app.services.documents import SUPPORTED
 
 class Config(BaseSettings):
@@ -29,6 +29,8 @@ init_db(cfg.database_path)
 engine=Engine(cfg.embedding_model,cfg.index_dir,cfg.top_k,cfg.evidence_threshold,cfg.enable_web_fallback)
 if engine.index is None: engine.rebuild("data/knowledge_base")
 class Question(BaseModel): question:str
+class Feedback(BaseModel):
+    feedback: str
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(
@@ -45,13 +47,22 @@ def ask(payload: Question):
 
     if not q:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
-
     result = engine.ask(q)
-    save(cfg.database_path, q, result["answer"])
+    history_id = save(cfg.database_path, q, result["answer"])
+    result["history_id"] = history_id
     return result
-
+    
 @app.get("/api/history")
 def get_history(): return {"items":history(cfg.database_path)}
+@app.post("/api/feedback/{history_id}")
+def submit_feedback(history_id: int, payload: Feedback):
+    return {
+        "success": add_feedback(
+            cfg.database_path,
+            history_id,
+            payload.feedback
+        )
+    }
 @app.get("/api/documents")
 def docs():
     unique={d["source"]:{"filename":d["source"],"category":d["category"]} for d in engine.docs}

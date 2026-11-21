@@ -153,6 +153,10 @@ async function ask(q) {
         el.innerHTML = `
             <b>RestaurantOps AI</b>
             ${formatAnswer(d.answer)}
+            <div class="feedback">
+                 <button type="button" onclick="sendFeedback(${d.history_id}, 'useful')">Useful</button>
+                 <button type="button" onclick="sendFeedback(${d.history_id}, 'not_useful')">Not useful</button>
+            </div>
             <div class="source">
                 Route: ${esc(d.route)}<br>
                 Sources:
@@ -249,4 +253,15 @@ async function loadHistory() {
         "history-list",
         d.items.map(x => `${x.created} · ${x.question}`)
     );
+}
+async function sendFeedback(historyId, feedback) {
+    await fetch(`/api/feedback/${historyId}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            feedback: feedback
+        })
+    });
 }
