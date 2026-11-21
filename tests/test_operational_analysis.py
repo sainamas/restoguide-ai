@@ -1,4 +1,4 @@
-from app.services.operational_analysis import get_operational_evidence
+from app.services.operations import get_operational_evidence
 
 
 def test_operational_evidence_contains_all_sections():

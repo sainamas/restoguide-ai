@@ -1,4 +1,4 @@
-from app.services.operational_recommendations import (
+from app.services.operations import (
     build_operational_recommendations,
 )
 

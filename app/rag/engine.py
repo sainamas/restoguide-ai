@@ -10,11 +10,11 @@ from langgraph.graph import END, StateGraph
 from sentence_transformers import SentenceTransformer
 
 from app.services.documents import load_file
-from app.services.operational_analysis import get_operational_evidence
-from app.services.operational_reasoning import (
+from app.services.operations import get_operational_evidence
+from app.services.operations import (
     build_operational_reasoning_context,
 )
-from app.services.operational_recommendations import (
+from app.services.operations import (
     build_operational_recommendations,
 )
 
